@@ -1,0 +1,152 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  /* Identidade Busa — azul-marinho profundo + ciano */
+  --color-bg: #05101f;
+  --color-surface: #0a192e;
+  --color-card: #0d2038;
+  --color-elevated: #122a47;
+  --color-hover: #183355;
+  --color-line: #1e3a5f;
+  --color-line-soft: #152c49;
+  --color-muted: #8ba3c4;
+  --color-faint: #5a748f;
+  --color-brand: #1ba3e0;
+  --color-brand2: #29b6f0;
+  --color-accent: #4dd0f5;
+
+  /* Remapeia a paleta violet/indigo para o azul/ciano da Busa,
+     mantendo consistência em toda a UI sem editar cada arquivo. */
+  --color-violet-200: #bfe9ff;
+  --color-violet-300: #6cd0f7;
+  --color-violet-400: #33bdf1;
+  --color-violet-500: #1ba3e0;
+  --color-violet-600: #1184c0;
+  --color-violet-700: #0d6ba0;
+  --color-indigo-500: #1c74c4;
+  --color-indigo-600: #12518f;
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: #e7e9f0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  outline-color: #29b6f0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e3a5f;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a507f;
+  background-clip: content-box;
+}
+
+/* Selection */
+::selection {
+  background: rgba(27, 163, 224, 0.4);
+  color: #fff;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Remove number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease both;
+}
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-scale-in {
+  animation: scaleIn 0.2s ease both;
+}
+
+.grid-bg {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+.glow-brand {
+  box-shadow: 0 0 0 1px rgba(27, 163, 224, 0.3), 0 8px 30px -8px rgba(27, 163, 224, 0.45);
+}
