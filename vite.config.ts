@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+// Porta padrão do dev server (configurável via PORT)
 const port = Number(process.env.PORT || 4173);
 
 export default defineConfig({
