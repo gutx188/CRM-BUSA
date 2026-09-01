@@ -15,9 +15,13 @@
 - ✅ **Upload de documentos** (armazenados localmente)
 - ✅ **Log de atividades**
 - ✅ **Sincronização opcional com PocketBase** (desativada por padrão)
+- ✅ **Relatório de Assistências** (menu Operação → Relatório): resumo geral + tabela filtrável
+  - Filtros: período (data início/fim, ano, mês), tipo de assistência, status, localização (cidade/estado/CEP), nome do segurado, nº da apólice/protocolo e CPF/CNPJ
+  - Cards de resumo (total, em andamento, finalizadas, canceladas), chips dos filtros aplicados e exportação CSV
 
 ## URLs
 - **Sandbox (desenvolvimento)**: https://3000-i95xto7mm0qigg4ungbiv-b237eb32.sandbox.novita.ai
+- **GitHub**: https://github.com/gutx188/CRM-BUSA
 - **Produção**: (ainda não implantado — ver "Próximos passos")
 
 ## Credenciais de Teste (seed)
