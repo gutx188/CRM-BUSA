@@ -6,6 +6,7 @@ import { Assistencias } from "@/pages/Assistencias";
 import { SinistroForm } from "@/pages/SinistroForm";
 import { Sinistros } from "@/pages/Sinistros";
 import { Buscar } from "@/pages/Buscar";
+import { Relatorio } from "@/pages/Relatorio";
 
 function CurrentView() {
   const { view } = useApp();
@@ -23,6 +24,8 @@ function CurrentView() {
       return <Sinistros />;
     case "buscar":
       return <Buscar />;
+    case "relatorio":
+      return <Relatorio />;
     default:
       return <Dashboard />;
   }
