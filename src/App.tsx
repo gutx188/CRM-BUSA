@@ -7,6 +7,7 @@ import { SinistroForm } from "@/pages/SinistroForm";
 import { Sinistros } from "@/pages/Sinistros";
 import { Buscar } from "@/pages/Buscar";
 import { Relatorio } from "@/pages/Relatorio";
+import { RelatorioSinistros } from "@/pages/RelatorioSinistros";
 
 function CurrentView() {
   const { view } = useApp();
@@ -26,6 +27,8 @@ function CurrentView() {
       return <Buscar />;
     case "relatorio":
       return <Relatorio />;
+    case "relatorio-sinistros":
+      return <RelatorioSinistros />;
     default:
       return <Dashboard />;
   }

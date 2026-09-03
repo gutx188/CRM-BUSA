@@ -8,6 +8,7 @@ import {
   IconCar,
   IconSearch,
   IconDoc,
+  IconShield,
 } from "@/components/Icons";
 
 export interface NavItem {
@@ -46,7 +47,8 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Operação",
     items: [
       { view: "buscar", label: "Buscar", icon: IconSearch },
-      { view: "relatorio", label: "Relatório", icon: IconDoc },
+      { view: "relatorio", label: "Relatório · Assistências", icon: IconDoc },
+      { view: "relatorio-sinistros", label: "Relatório · Sinistros", icon: IconShield },
     ],
   },
 ];
@@ -59,6 +61,7 @@ export const VIEW_TITLES: Record<View, { title: string; subtitle: string }> = {
   sinistros: { title: "Sinistros", subtitle: "Gestão de sinistros" },
   buscar: { title: "Busca Global", subtitle: "Pesquisar em todo o sistema" },
   relatorio: { title: "Relatório de Assistências", subtitle: "Resumo geral e busca detalhada com filtros" },
+  "relatorio-sinistros": { title: "Relatório de Sinistros", subtitle: "Resumo consolidado, filtros e exportação PDF/JSON" },
   clientes: { title: "Dashboard", subtitle: "Visão geral das operações" },
   seguradoras: { title: "Dashboard", subtitle: "Visão geral das operações" },
   oficinas: { title: "Dashboard", subtitle: "Visão geral das operações" },

@@ -156,6 +156,7 @@ export type View =
   | "novo-sinistro"
   | "sinistros"
   | "relatorio"
+  | "relatorio-sinistros"
   | "buscar"
   | "clientes"
   | "seguradoras"
