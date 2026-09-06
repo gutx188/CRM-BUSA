@@ -7,7 +7,6 @@ import {
 } from "@/lib/constants";
 import type { StatusAssistencia, Assistencia, Cliente } from "@/lib/types";
 import { normalize, formatDate } from "@/lib/utils";
-import { gerarPdfAssistencias } from "@/lib/report-pdf";
 import {
   Button,
   Input,
@@ -253,6 +252,7 @@ export function Relatorio() {
   const exportarPdf = async () => {
     setPdfBusy(true);
     try {
+      const { gerarPdfAssistencias } = await import("@/lib/report-pdf");
       const porStatus: Record<string, number> = {};
       STATUS_ASSISTENCIA_OPTS.forEach((s) => (porStatus[s] = 0));
       filtradas.forEach((a) => {

@@ -3,7 +3,6 @@ import { useApp } from "@/store/AppStore";
 import { STATUS_SINISTRO, STATUS_SINISTRO_OPTS } from "@/lib/constants";
 import type { StatusSinistro, Sinistro, Cliente } from "@/lib/types";
 import { normalize, formatDate } from "@/lib/utils";
-import { gerarPdfSinistros } from "@/lib/report-pdf";
 import {
   Button,
   Input,
@@ -264,6 +263,7 @@ export function RelatorioSinistros() {
   const exportarPdf = async () => {
     setPdfBusy(true);
     try {
+      const { gerarPdfSinistros } = await import("@/lib/report-pdf");
       await gerarPdfSinistros(filtrados, clienteById, filtrosAtivos, porStatus, incluirFichas);
     } finally {
       setPdfBusy(false);
