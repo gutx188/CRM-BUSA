@@ -9,8 +9,23 @@ export const uid = (prefix = ""): string =>
 
 export const nowISO = (): string => new Date().toISOString();
 
+/**
+ * Datas puras ("YYYY-MM-DD", como as dos inputs type=date) NÃO devem passar
+ * por `new Date(string)`: o JS interpreta como meia-noite UTC e, ao exibir no
+ * fuso local, a data desloca um dia. Formatamos direto da string.
+ */
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function formatDateOnly(iso: string): string | null {
+  const m = iso.match(DATE_ONLY_RE);
+  if (!m) return null;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 export function formatDateTime(iso?: string): string {
   if (!iso) return "—";
+  const dateOnly = formatDateOnly(iso);
+  if (dateOnly) return dateOnly;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleString("pt-BR", {
@@ -24,6 +39,8 @@ export function formatDateTime(iso?: string): string {
 
 export function formatDate(iso?: string): string {
   if (!iso) return "—";
+  const dateOnly = formatDateOnly(iso);
+  if (dateOnly) return dateOnly;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("pt-BR");

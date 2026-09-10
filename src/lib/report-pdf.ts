@@ -1,24 +1,26 @@
 import { jsPDF } from "jspdf";
-import QRCode from "qrcode";
-import type { Assistencia, Sinistro, Cliente, StatusSinistro } from "./types";
+import type { Assistencia, Sinistro, Cliente } from "./types";
 import { formatDate, formatDateTime } from "./utils";
 
 // ---------------------------------------------------------------------------
-// Paleta do documento (visual do papel timbrado Busa)
+// Paleta do documento (visual limpo do timbrado Busa)
 // ---------------------------------------------------------------------------
-const NAVY: [number, number, number] = [10, 37, 64]; // #0a2540
-const BRAND: [number, number, number] = [27, 163, 224]; // #1ba3e0
-const TEXT_DARK: [number, number, number] = [30, 41, 59];
-const TEXT_MUTED: [number, number, number] = [100, 116, 139];
-const LINE: [number, number, number] = [226, 232, 240];
+const NAVY: [number, number, number] = [16, 42, 67]; // wordmark "Busa"
+const BLUE: [number, number, number] = [23, 116, 199]; // títulos de seção
+const CYAN: [number, number, number] = [41, 182, 240]; // sublinhado do título
+const TEXT_DARK: [number, number, number] = [45, 55, 72];
+const TEXT_LABEL: [number, number, number] = [74, 85, 104];
+const TEXT_MUTED: [number, number, number] = [113, 128, 150];
+const LINE: [number, number, number] = [222, 228, 236];
 
 const PAGE_W = 210;
 const PAGE_H = 297;
-const MARGIN = 16;
+const MARGIN = 20;
 const CONTENT_W = PAGE_W - MARGIN * 2;
+const VALUE_X = MARGIN + 58; // coluna dos valores nas linhas rótulo/valor
 
 // ---------------------------------------------------------------------------
-// Assets (logo + QR) carregados uma única vez por exportação
+// Assets
 // ---------------------------------------------------------------------------
 interface Assets {
   logo: { dataUrl: string; ratio: number } | null;
@@ -44,183 +46,99 @@ async function loadLogo(): Promise<Assets["logo"]> {
   }
 }
 
-async function makeQr(text: string): Promise<string> {
-  return QRCode.toDataURL(text, {
-    margin: 0,
-    width: 256,
-    color: { dark: "#0a2540", light: "#ffffff" },
-  });
-}
-
 // ---------------------------------------------------------------------------
-// Elementos gráficos do timbrado
+// Elementos do layout
 // ---------------------------------------------------------------------------
 
-/** Cantos decorativos navy (superior direito e inferior esquerdo) + acento ciano. */
-function drawFrame(doc: jsPDF) {
-  // Canto superior direito: bloco navy arredondado saindo da página
-  doc.setFillColor(...NAVY);
-  doc.roundedRect(PAGE_W - 38, -14, 60, 42, 12, 12, "F");
-  // Acento ciano fino sob o bloco
-  doc.setFillColor(...BRAND);
-  doc.circle(PAGE_W - 6, 34, 3.2, "F");
+/** Cabeçalho: wordmark Busa + gota à esquerda; título em duas linhas à direita
+ *  com sublinhado ciano curto centralizado. */
+function drawHeader(doc: jsPDF, assets: Assets, tituloL2: string): number {
+  const y = 20;
 
-  // Canto inferior esquerdo: quarto de círculo navy
-  doc.setFillColor(...NAVY);
-  doc.circle(0, PAGE_H, 34, "F");
-  doc.setFillColor(...BRAND);
-  doc.circle(0, PAGE_H, 12, "F");
-
-  // Canto inferior direito: onda pequena
-  doc.setFillColor(...NAVY);
-  doc.circle(PAGE_W, PAGE_H, 22, "F");
-}
-
-/** Cabeçalho: logo Busa + título do documento à direita. */
-function drawHeader(doc: jsPDF, assets: Assets, tituloL1: string, tituloL2: string) {
-  const y = 16;
-  let x = MARGIN;
-
-  // Wordmark "Busa" + gota
+  // Wordmark
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
+  doc.setFontSize(27);
   doc.setTextColor(...NAVY);
-  doc.text("Busa", x, y + 9);
+  doc.text("Busa", MARGIN, y + 9);
   const busaW = doc.getTextWidth("Busa");
   if (assets.logo) {
-    const h = 11;
-    doc.addImage(assets.logo.dataUrl, "PNG", x + busaW + 2, y - 1.5, h * assets.logo.ratio, h);
+    const h = 12;
+    doc.addImage(assets.logo.dataUrl, "PNG", MARGIN + busaW + 2.5, y - 2, h * assets.logo.ratio, h);
   }
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text("corretora de seguros", x, y + 14.5);
+  doc.text("corretora de seguros", MARGIN, y + 15);
 
   // Título à direita
-  const tx = PAGE_W - 46;
+  const tx = PAGE_W - MARGIN - 24;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(11.5);
   doc.setTextColor(...TEXT_DARK);
-  doc.text(tituloL1, tx, y + 4, { align: "center" });
+  doc.text("RELATÓRIO DE", tx, y + 3, { align: "center" });
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(13);
   doc.text(tituloL2, tx, y + 9.5, { align: "center" });
-  doc.setDrawColor(...BRAND);
-  doc.setLineWidth(0.9);
-  const underW = Math.max(doc.getTextWidth(tituloL2), 22);
-  doc.line(tx - underW / 2, y + 12, tx + underW / 2, y + 12);
 
-  return y + 24; // y inicial do conteúdo
+  // Sublinhado ciano curto, centralizado sob o título
+  doc.setDrawColor(...CYAN);
+  doc.setLineWidth(1.1);
+  doc.line(tx - 7, y + 14.5, tx + 7, y + 14.5);
+
+  return y + 28;
 }
 
+/** Título de seção numerado em azul. */
 function sectionHeading(doc: jsPDF, y: number, texto: string): number {
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.setTextColor(...BRAND);
+  doc.setFontSize(10.5);
+  doc.setTextColor(...BLUE);
   doc.text(texto.toUpperCase(), MARGIN, y);
-  return y + 5.5;
+  return y + 7;
 }
 
-/** Linha rótulo/valor com filete inferior, como no documento da imagem. */
+/** Linha rótulo/valor com filete cinza inferior. */
 function kvRow(doc: jsPDF, y: number, label: string, value: string): number {
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...TEXT_MUTED);
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_LABEL);
   doc.text(label, MARGIN, y);
+
   doc.setTextColor(...TEXT_DARK);
-  doc.setFont("helvetica", "bold");
-  const v = doc.splitTextToSize(value || "—", CONTENT_W - 62);
-  doc.text(v, MARGIN + 60, y);
-  const rowH = 4 + (v.length - 1) * 3.8;
+  const v = doc.splitTextToSize(value || "—", PAGE_W - MARGIN - VALUE_X);
+  doc.text(v, VALUE_X, y);
+
+  const rowH = 5 + (v.length - 1) * 4;
   doc.setDrawColor(...LINE);
-  doc.setLineWidth(0.2);
-  doc.line(MARGIN, y + rowH - 1.4, PAGE_W - MARGIN, y + rowH - 1.4);
-  return y + rowH + 2.4;
+  doc.setLineWidth(0.25);
+  doc.line(MARGIN, y + rowH - 1.6, PAGE_W - MARGIN, y + rowH - 1.6);
+  return y + rowH + 2.8;
 }
 
+/** Parágrafo de texto corrido. */
 function paragraph(doc: jsPDF, y: number, texto: string): number {
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   doc.setTextColor(...TEXT_DARK);
   const lines = doc.splitTextToSize(texto || "—", CONTENT_W);
   doc.text(lines, MARGIN, y);
-  return y + lines.length * 3.9 + 3;
+  return y + lines.length * 4.4 + 4;
 }
 
-/** Rodapé com QR code e link de acompanhamento. */
-function drawFooterQr(doc: jsPDF, qrDataUrl: string, titulo: string, link: string) {
-  const y = PAGE_H - 34;
-  const qrSize = 17;
-  doc.addImage(qrDataUrl, "PNG", MARGIN + 4, y, qrSize, qrSize);
+/** Linha "Rótulo: valor" com rótulo em negrito (ex.: Responsável: Carlos). */
+function boldLabelLine(doc: jsPDF, y: number, label: string, value: string): number {
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   doc.setTextColor(...TEXT_DARK);
-  doc.text(titulo, MARGIN + 4 + qrSize + 5, y + 5);
+  doc.text(`${label}:`, MARGIN, y);
+  const w = doc.getTextWidth(`${label}: `);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text("Escaneie o QR Code ou acesse:", MARGIN + 4 + qrSize + 5, y + 9.5);
-  doc.setTextColor(...BRAND);
-  doc.text(link, MARGIN + 4 + qrSize + 5, y + 13.5);
-}
-
-/** Timeline horizontal de status (como no relatório de sinistro da imagem). */
-function drawTimeline(
-  doc: jsPDF,
-  y: number,
-  etapas: { label: string; sub?: string }[],
-  concluidas: number,
-  cancelado: boolean,
-): number {
-  const usableW = CONTENT_W - 20;
-  const step = usableW / (etapas.length - 1);
-  const cy = y + 4;
-  const r = 3.4;
-
-  etapas.forEach((etapa, i) => {
-    const cx = MARGIN + 10 + i * step;
-
-    // Conector
-    if (i < etapas.length - 1) {
-      doc.setDrawColor(...(i < concluidas ? NAVY : LINE));
-      doc.setLineWidth(0.7);
-      doc.line(cx + r, cy, cx + step - r, cy);
-    }
-
-    const done = i < concluidas;
-    if (done && !cancelado) {
-      doc.setFillColor(...NAVY);
-      doc.circle(cx, cy, r, "F");
-      // check
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.6);
-      doc.line(cx - 1.4, cy, cx - 0.3, cy + 1.2);
-      doc.line(cx - 0.3, cy + 1.2, cx + 1.6, cy - 1.2);
-    } else {
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(...(cancelado ? ([225, 29, 72] as [number, number, number]) : LINE));
-      doc.setLineWidth(0.7);
-      doc.circle(cx, cy, r, "FD");
-    }
-
-    doc.setFont("helvetica", done ? "bold" : "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...(done ? NAVY : TEXT_MUTED));
-    const lines = doc.splitTextToSize(etapa.label, step - 4);
-    doc.text(lines, cx, cy + r + 4, { align: "center" });
-    if (etapa.sub) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
-      doc.setTextColor(...TEXT_MUTED);
-      doc.text(etapa.sub, cx, cy + r + 4 + lines.length * 3, { align: "center" });
-    }
-  });
-
-  return y + 22;
+  doc.text(value || "—", MARGIN + w + 1, y);
+  return y + 5.2;
 }
 
 // ---------------------------------------------------------------------------
-// Página de resumo (capa do relatório)
+// Páginas de resumo (capa do relatório consolidado)
 // ---------------------------------------------------------------------------
 interface ResumoOpts {
   tituloL2: string;
@@ -229,14 +147,10 @@ interface ResumoOpts {
   filtros: string[];
   colunas: string[];
   linhas: string[][];
-  qr: string;
-  linkQr: string;
-  qrTitulo: string;
 }
 
 function drawResumoPages(doc: jsPDF, assets: Assets, opts: ResumoOpts) {
-  drawFrame(doc);
-  let y = drawHeader(doc, assets, "RELATÓRIO DE", opts.tituloL2);
+  let y = drawHeader(doc, assets, opts.tituloL2);
 
   y = sectionHeading(doc, y, "1. Resumo Geral");
   y = kvRow(doc, y, "Total de registros", String(opts.total));
@@ -248,46 +162,45 @@ function drawResumoPages(doc: jsPDF, assets: Assets, opts: ResumoOpts) {
     opts.filtros.length > 0 ? opts.filtros.join(" · ") : "Nenhum (visão geral)",
   );
 
-  y += 2;
+  y += 3;
   y = sectionHeading(doc, y, "2. Distribuição por Status");
   for (const [status, count] of Object.entries(opts.porStatus)) {
     y = kvRow(doc, y, status, String(count));
   }
 
-  y += 2;
+  y += 3;
   y = sectionHeading(doc, y, "3. Relação de Registros");
 
-  const colW = [26, 30, 46, 30, CONTENT_W - 132];
+  const colW = [27, 27, 44, 30, CONTENT_W - 128];
   const drawTableHeader = (yy: number): number => {
-    doc.setFillColor(244, 247, 250);
-    doc.rect(MARGIN, yy - 3.5, CONTENT_W, 6, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...NAVY);
-    let xx = MARGIN + 1.5;
+    doc.setFontSize(8);
+    doc.setTextColor(...BLUE);
+    let xx = MARGIN;
     opts.colunas.forEach((c, i) => {
       doc.text(c.toUpperCase(), xx, yy);
       xx += colW[i];
     });
-    return yy + 5.5;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.35);
+    doc.line(MARGIN, yy + 1.8, PAGE_W - MARGIN, yy + 1.8);
+    return yy + 6.5;
   };
 
   y = drawTableHeader(y);
-  const bottomLimit = PAGE_H - 42;
+  const bottomLimit = PAGE_H - 20;
 
   for (const linha of opts.linhas) {
     if (y > bottomLimit) {
-      drawFooterQr(doc, opts.qr, opts.qrTitulo, opts.linkQr);
       doc.addPage();
-      drawFrame(doc);
-      y = drawHeader(doc, assets, "RELATÓRIO DE", opts.tituloL2);
+      y = drawHeader(doc, assets, opts.tituloL2);
       y = sectionHeading(doc, y, "3. Relação de Registros (continuação)");
       y = drawTableHeader(y);
     }
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(8.5);
     doc.setTextColor(...TEXT_DARK);
-    let xx = MARGIN + 1.5;
+    let xx = MARGIN;
     let maxLines = 1;
     linha.forEach((celula, i) => {
       const wrapped = doc.splitTextToSize(celula || "—", colW[i] - 3);
@@ -296,42 +209,17 @@ function drawResumoPages(doc: jsPDF, assets: Assets, opts: ResumoOpts) {
       maxLines = Math.max(maxLines, shown.length);
       xx += colW[i];
     });
-    const rowH = maxLines * 3.4 + 2;
+    const rowH = maxLines * 3.8 + 2.4;
     doc.setDrawColor(...LINE);
-    doc.setLineWidth(0.2);
-    doc.line(MARGIN, y + rowH - 2.6, PAGE_W - MARGIN, y + rowH - 2.6);
-    y += rowH + 1;
+    doc.setLineWidth(0.25);
+    doc.line(MARGIN, y + rowH - 3, PAGE_W - MARGIN, y + rowH - 3);
+    y += rowH + 1.2;
   }
-
-  drawFooterQr(doc, opts.qr, opts.qrTitulo, opts.linkQr);
 }
 
 // ---------------------------------------------------------------------------
 // PDF: Relatório de Sinistros
 // ---------------------------------------------------------------------------
-
-const ETAPAS_SINISTRO: { chave: StatusSinistro[]; label: string }[] = [
-  { chave: ["Pendente", "Documentação"], label: "Aviso Recebido" },
-  { chave: ["Em análise"], label: "Análise" },
-  { chave: ["Em oficina"], label: "Em Oficina" },
-  { chave: ["Finalizado"], label: "Conclusão" },
-];
-
-function etapasConcluidas(status: StatusSinistro): number {
-  switch (status) {
-    case "Pendente":
-    case "Documentação":
-      return 1;
-    case "Em análise":
-      return 2;
-    case "Em oficina":
-      return 3;
-    case "Finalizado":
-      return 4;
-    case "Cancelado":
-      return 0;
-  }
-}
 
 export async function gerarPdfSinistros(
   sinistros: Sinistro[],
@@ -342,7 +230,6 @@ export async function gerarPdfSinistros(
 ): Promise<void> {
   const assets: Assets = { logo: await loadLogo() };
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const qrGeral = await makeQr("https://busaseguros.com.br/sinistros");
 
   drawResumoPages(doc, assets, {
     tituloL2: "SINISTROS",
@@ -357,16 +244,12 @@ export async function gerarPdfSinistros(
       s.status,
       s.localizacaoSinistro || clienteById.get(s.clienteId)?.endereco || "—",
     ]),
-    qr: qrGeral,
-    linkQr: "busaseguros.com.br/sinistros",
-    qrTitulo: "Acompanhe seus sinistros",
   });
 
   if (incluirFichas) {
     for (const s of sinistros) {
       doc.addPage();
-      drawFrame(doc);
-      let y = drawHeader(doc, assets, "RELATÓRIO DE", "SINISTRO");
+      let y = drawHeader(doc, assets, "SINISTRO");
       const cliente = clienteById.get(s.clienteId);
 
       y = sectionHeading(doc, y, "1. Dados do Sinistro");
@@ -383,27 +266,24 @@ export async function gerarPdfSinistros(
       y = kvRow(doc, y, "Seguradora", s.seguradoraNome);
       y = kvRow(doc, y, "Veículo", s.veiculo || "—");
       y = kvRow(doc, y, "Placa", s.placa || "—");
-      y = kvRow(
-        doc,
-        y,
-        "Local do Sinistro",
-        s.localizacaoSinistro || cliente?.endereco || "—",
-      );
+      y = kvRow(doc, y, "Local do Sinistro", s.localizacaoSinistro || cliente?.endereco || "—");
       if (s.oficinaNome) y = kvRow(doc, y, "Oficina", s.oficinaNome);
 
-      y += 2;
+      y += 4;
       y = sectionHeading(doc, y, "2. Descrição do Sinistro");
       y = paragraph(doc, y, s.descricao);
 
-      y += 1;
+      y += 2;
       y = sectionHeading(doc, y, "3. Danos Declarados");
       y = paragraph(doc, y, s.descricaoDanos || s.observacoes || "Sem danos adicionais declarados.");
 
-      // Registro fotográfico (até 3 imagens dos documentos)
+      // Registro fotográfico (até 3 imagens anexadas)
       const fotos = s.documentos.filter((d) => d.tipo.startsWith("image/")).slice(0, 3);
-      if (fotos.length > 0 && y < 195) {
-        y += 1;
-        y = sectionHeading(doc, y, "4. Registro Fotográfico");
+      let proxSecao = 4;
+      if (fotos.length > 0 && y < 205) {
+        y += 2;
+        y = sectionHeading(doc, y, `${proxSecao}. Registro Fotográfico`);
+        proxSecao++;
         const fw = (CONTENT_W - 8) / 3;
         const fh = fw * 0.62;
         fotos.forEach((f, i) => {
@@ -413,33 +293,15 @@ export async function gerarPdfSinistros(
             /* imagem inválida: ignora */
           }
         });
-        y += fh + 6;
+        y += fh + 8;
       }
 
-      y += 1;
-      y = sectionHeading(
-        doc,
-        y,
-        `${fotos.length > 0 ? "5" : "4"}. Status do Sinistro${s.status === "Cancelado" ? " — CANCELADO" : ""}`,
-      );
-      y = drawTimeline(
-        doc,
-        y,
-        ETAPAS_SINISTRO.map((e, i) => ({
-          label: e.label,
-          sub:
-            i === etapasConcluidas(s.status) - 1
-              ? s.status === "Finalizado" && s.resolvidoEm
-                ? formatDate(s.resolvidoEm)
-                : s.status
-              : undefined,
-        })),
-        etapasConcluidas(s.status),
-        s.status === "Cancelado",
-      );
-
-      const qr = await makeQr(`https://busaseguros.com.br/sinistro/${s.numero}`);
-      drawFooterQr(doc, qr, "Acompanhe seu sinistro", `busaseguros.com.br/sinistro/${s.numero}`);
+      y += 2;
+      y = sectionHeading(doc, y, `${proxSecao}. Status do Sinistro`);
+      y = boldLabelLine(doc, y, "Status atual", s.status);
+      if (s.status === "Finalizado" && s.resolvidoEm) {
+        y = boldLabelLine(doc, y, "Concluído em", formatDateTime(s.resolvidoEm));
+      }
     }
   }
 
@@ -459,7 +321,6 @@ export async function gerarPdfAssistencias(
 ): Promise<void> {
   const assets: Assets = { logo: await loadLogo() };
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const qrGeral = await makeQr("https://busaseguros.com.br/atendimentos");
 
   const localDe = (a: Assistencia) =>
     [a.origem, a.destino && a.destino !== "—" ? a.destino : ""]
@@ -467,7 +328,7 @@ export async function gerarPdfAssistencias(
       .join(" → ") || "—";
 
   drawResumoPages(doc, assets, {
-    tituloL2: "ASSISTÊNCIA",
+    tituloL2: "ASSISTÊNCIAS",
     total: assistencias.length,
     porStatus,
     filtros,
@@ -479,16 +340,12 @@ export async function gerarPdfAssistencias(
       a.status,
       a.tipo,
     ]),
-    qr: qrGeral,
-    linkQr: "busaseguros.com.br/atendimentos",
-    qrTitulo: "Acompanhe seus atendimentos",
   });
 
   if (incluirFichas) {
     for (const a of assistencias) {
       doc.addPage();
-      drawFrame(doc);
-      let y = drawHeader(doc, assets, "RELATÓRIO DE", "ASSISTÊNCIA");
+      let y = drawHeader(doc, assets, "ASSISTÊNCIA");
       const cliente = clienteById.get(a.clienteId);
 
       y = sectionHeading(doc, y, "1. Dados Gerais");
@@ -504,23 +361,22 @@ export async function gerarPdfAssistencias(
       y = kvRow(doc, y, "CPF/CNPJ", cliente?.documento || "—");
       y = kvRow(doc, y, "Solicitante", a.solicitante || a.clienteNome);
       y = kvRow(doc, y, "Telefone", a.telefone || "—");
-      y = kvRow(doc, y, "Seguradora", a.seguradoraNome);
       y = kvRow(doc, y, "Local do Atendimento", localDe(a));
 
-      y += 2;
+      y += 4;
       y = sectionHeading(doc, y, "2. Descrição do Atendimento");
       y = paragraph(doc, y, `${a.assunto ? a.assunto + ". " : ""}${a.descricao}`);
 
-      y += 1;
+      y += 2;
       y = sectionHeading(doc, y, "3. Providências Tomadas");
       y = paragraph(doc, y, a.observacoes || "Atendimento acionado junto à seguradora.");
 
-      y += 1;
-      y = sectionHeading(doc, y, "4. Responsável pelo Atendimento");
-      y = kvRow(doc, y, "Responsável", a.responsavel || "—");
-      y = kvRow(doc, y, "Status atual", a.status);
-
       y += 2;
+      y = sectionHeading(doc, y, "4. Prestador do Serviço");
+      y = kvRow(doc, y, "Seguradora", a.seguradoraNome);
+      y = kvRow(doc, y, "Telefone", a.telefone || "—");
+
+      y += 4;
       y = sectionHeading(doc, y, "5. Encerramento");
       y = paragraph(
         doc,
@@ -531,14 +387,8 @@ export async function gerarPdfAssistencias(
             ? "Atendimento cancelado."
             : "Atendimento em aberto.",
       );
-
-      const qr = await makeQr(`https://busaseguros.com.br/atendimento/${a.protocolo}`);
-      drawFooterQr(
-        doc,
-        qr,
-        "Acompanhe seu atendimento",
-        `busaseguros.com.br/atendimento/${a.protocolo}`,
-      );
+      y = boldLabelLine(doc, y, "Responsável", a.responsavel || "—");
+      y = boldLabelLine(doc, y, "Status", a.status);
     }
   }
 

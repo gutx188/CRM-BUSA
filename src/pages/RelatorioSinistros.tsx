@@ -23,7 +23,6 @@ import {
   IconCheckCircle,
   IconClock,
   IconAlert,
-  IconChevronDown,
 } from "@/components/Icons";
 
 // ---------------------------------------------------------------------------
@@ -89,10 +88,8 @@ function cidadeDe(local: string): string {
 export function RelatorioSinistros() {
   const { sinistros, clientes } = useApp();
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
-  const [jsonOpen, setJsonOpen] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [incluirFichas, setIncluirFichas] = useState(true);
-  const [copied, setCopied] = useState(false);
 
   const set = <K extends keyof Filtros>(key: K, value: Filtros[K]) =>
     setFiltros((f) => ({ ...f, [key]: value }));
@@ -240,16 +237,6 @@ export function RelatorioSinistros() {
     [relatorioJson],
   );
 
-  const copiarJson = async () => {
-    try {
-      await navigator.clipboard.writeText(jsonTexto);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* clipboard indisponível */
-    }
-  };
-
   const baixarJson = () => {
     const blob = new Blob([jsonTexto], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -274,15 +261,15 @@ export function RelatorioSinistros() {
     <div className="space-y-5">
       <PageHeader
         title="Relatório de Sinistros"
-        subtitle="Resumo consolidado, filtros e exportação em PDF/JSON"
+        subtitle="Resumo consolidado, filtros e exportação em PDF"
         icon={<IconCar className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => setFiltros(FILTROS_INICIAIS)}>
               <IconRefresh className="h-4 w-4" /> Limpar filtros
             </Button>
-            <Button variant="ghost" onClick={() => setJsonOpen((v) => !v)}>
-              {"{ }"} JSON
+            <Button variant="ghost" onClick={baixarJson} disabled={filtrados.length === 0}>
+              Baixar JSON
             </Button>
             <Button onClick={exportarPdf} disabled={pdfBusy || filtrados.length === 0}>
               <IconDoc className="h-4 w-4" />
@@ -438,40 +425,6 @@ export function RelatorioSinistros() {
                 {c}
               </span>
             ))}
-          </div>
-        )}
-      </section>
-
-      {/* Saída JSON */}
-      <section
-        id="rel-sin-json"
-        className="overflow-hidden rounded-2xl border border-line-soft bg-card shadow-lg shadow-black/20"
-      >
-        <button
-          onClick={() => setJsonOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-hover"
-        >
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-bold text-violet-300">{"{ }"}</span>
-            <h3 className="text-sm font-bold text-white">Relatório estruturado (JSON)</h3>
-          </div>
-          <IconChevronDown
-            className={`h-5 w-5 text-faint transition-transform ${jsonOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-        {jsonOpen && (
-          <div className="border-t border-line-soft">
-            <div className="flex flex-wrap gap-2 px-5 py-3">
-              <Button variant="ghost" size="sm" onClick={copiarJson}>
-                {copied ? "✓ Copiado!" : "Copiar JSON"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={baixarJson}>
-                Baixar .json
-              </Button>
-            </div>
-            <pre className="max-h-96 overflow-auto border-t border-line-soft bg-bg/60 px-5 py-4 font-mono text-[11px] leading-relaxed text-emerald-200">
-              {jsonTexto}
-            </pre>
           </div>
         )}
       </section>
