@@ -50,6 +50,7 @@ interface Filtros {
   ano: string;
   mes: string;
   status: StatusSinistro | "all";
+  seguradora: string;
   localizacao: string;
   nomeSegurado: string;
   apolice: string;
@@ -62,6 +63,7 @@ const FILTROS_INICIAIS: Filtros = {
   ano: "all",
   mes: "all",
   status: "all",
+  seguradora: "",
   localizacao: "",
   nomeSegurado: "",
   apolice: "",
@@ -86,7 +88,7 @@ function cidadeDe(local: string): string {
 // ---------------------------------------------------------------------------
 
 export function RelatorioSinistros() {
-  const { sinistros, clientes } = useApp();
+  const { sinistros, clientes, seguradoras } = useApp();
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [incluirFichas, setIncluirFichas] = useState(true);
@@ -110,6 +112,7 @@ export function RelatorioSinistros() {
   }, [sinistros]);
 
   const filtrados = useMemo(() => {
+    const segQ = normalize(filtros.seguradora);
     const locQ = normalize(filtros.localizacao);
     const nomeQ = normalize(filtros.nomeSegurado);
     const apoliceQ = normalize(filtros.apolice);
@@ -124,6 +127,9 @@ export function RelatorioSinistros() {
         if (filtros.ano !== "all" && dataRef.slice(0, 4) !== filtros.ano) return false;
         if (filtros.mes !== "all" && dataRef.slice(5, 7) !== filtros.mes) return false;
         if (filtros.status !== "all" && s.status !== filtros.status) return false;
+
+        // Seguradora (nome editável — busca parcial, sem acentos)
+        if (segQ && !normalize(s.seguradoraNome).includes(segQ)) return false;
 
         const cliente = clienteById.get(s.clienteId);
 
@@ -174,6 +180,7 @@ export function RelatorioSinistros() {
     if (filtros.mes !== "all")
       chips.push(MESES.find((m) => m.value === filtros.mes)?.label ?? "");
     if (filtros.status !== "all") chips.push(filtros.status);
+    if (filtros.seguradora) chips.push(`Seguradora: ${filtros.seguradora}`);
     if (filtros.localizacao) chips.push(`Local: ${filtros.localizacao}`);
     if (filtros.nomeSegurado) chips.push(`Segurado: ${filtros.nomeSegurado}`);
     if (filtros.apolice) chips.push(`Apólice: ${filtros.apolice}`);
@@ -204,6 +211,7 @@ export function RelatorioSinistros() {
           month: filtros.mes !== "all" ? filtros.mes : null,
         },
         status: filtros.status !== "all" ? [filtros.status] : null,
+        insurer: filtros.seguradora || null,
         location: filtros.localizacao || null,
         insured_information: {
           name: filtros.nomeSegurado || null,
@@ -367,6 +375,22 @@ export function RelatorioSinistros() {
                 </option>
               ))}
             </Select>
+          </Field>
+
+          <Field label="Seguradora (nome editável)">
+            <>
+              <Input
+                list="seguradoras-sinistros"
+                placeholder="Digite ou escolha a seguradora"
+                value={filtros.seguradora}
+                onChange={(e) => set("seguradora", e.target.value)}
+              />
+              <datalist id="seguradoras-sinistros">
+                {seguradoras.map((s) => (
+                  <option key={s.id} value={s.nome} />
+                ))}
+              </datalist>
+            </>
           </Field>
 
           <Field label="Localização (cidade, estado, CEP)">

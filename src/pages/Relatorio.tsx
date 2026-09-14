@@ -55,6 +55,7 @@ interface Filtros {
   mes: string;
   tipo: string;
   status: StatusAssistencia | "all";
+  seguradora: string;
   localizacao: string;
   nomeSegurado: string;
   apolice: string;
@@ -68,6 +69,7 @@ const FILTROS_INICIAIS: Filtros = {
   mes: "all",
   tipo: "all",
   status: "all",
+  seguradora: "",
   localizacao: "",
   nomeSegurado: "",
   apolice: "",
@@ -99,7 +101,7 @@ function csvEscape(v: string): string {
 // ---------------------------------------------------------------------------
 
 export function Relatorio() {
-  const { assistencias, clientes } = useApp();
+  const { assistencias, clientes, seguradoras } = useApp();
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [incluirFichas, setIncluirFichas] = useState(true);
@@ -131,6 +133,7 @@ export function Relatorio() {
   }, [assistencias]);
 
   const filtradas = useMemo(() => {
+    const segQ = normalize(filtros.seguradora);
     const locQ = normalize(filtros.localizacao);
     const nomeQ = normalize(filtros.nomeSegurado);
     const apoliceQ = normalize(filtros.apolice);
@@ -156,6 +159,9 @@ export function Relatorio() {
         // Status
         if (filtros.status !== "all" && a.status !== filtros.status)
           return false;
+
+        // Seguradora (nome editável — busca parcial, sem acentos)
+        if (segQ && !normalize(a.seguradoraNome).includes(segQ)) return false;
 
         const cliente = clienteById.get(a.clienteId);
 
@@ -204,6 +210,7 @@ export function Relatorio() {
       chips.push(MESES.find((m) => m.value === filtros.mes)?.label ?? "");
     if (filtros.tipo !== "all") chips.push(filtros.tipo);
     if (filtros.status !== "all") chips.push(filtros.status);
+    if (filtros.seguradora) chips.push(`Seguradora: ${filtros.seguradora}`);
     if (filtros.localizacao) chips.push(`Local: ${filtros.localizacao}`);
     if (filtros.nomeSegurado) chips.push(`Segurado: ${filtros.nomeSegurado}`);
     if (filtros.apolice) chips.push(`Apólice: ${filtros.apolice}`);
@@ -394,6 +401,23 @@ export function Relatorio() {
                 </option>
               ))}
             </Select>
+          </Field>
+
+          {/* Seguradora — campo editável com sugestões das cadastradas */}
+          <Field label="Seguradora (nome editável)">
+            <>
+              <Input
+                list="seguradoras-assistencias"
+                placeholder="Digite ou escolha a seguradora"
+                value={filtros.seguradora}
+                onChange={(e) => set("seguradora", e.target.value)}
+              />
+              <datalist id="seguradoras-assistencias">
+                {seguradoras.map((s) => (
+                  <option key={s.id} value={s.nome} />
+                ))}
+              </datalist>
+            </>
           </Field>
 
           {/* Localização */}
