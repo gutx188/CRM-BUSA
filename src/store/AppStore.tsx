@@ -144,6 +144,10 @@ function viewFromPath(pathname: string): View {
 }
 
 function viewFromLocation(): View {
+  const pathname = window.location.pathname;
+  if (PATH_TO_VIEW[pathname]) return viewFromPath(pathname);
+
+  // Compatibilidade com links antigos que ainda usam hash routing.
   const hashPath = window.location.hash.replace(/^#/, "").split("?")[0];
   return viewFromPath(hashPath || "/dashboard");
 }
@@ -151,7 +155,7 @@ function viewFromLocation(): View {
 function paramsFromLocation(): NavParams {
   const hash = window.location.hash.replace(/^#/, "");
   const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
-  const search = new URLSearchParams(hashQuery || window.location.search.slice(1));
+  const search = new URLSearchParams(window.location.search.slice(1) || hashQuery);
   return {
     ...(search.get("q") ? { q: search.get("q")! } : {}),
     ...(search.get("id") ? { id: search.get("id")! } : {}),
@@ -238,11 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (typeof p.q === "string" && p.q) search.set("q", p.q);
     if (typeof p.id === "string" && p.id) search.set("id", p.id);
     const query = search.toString() ? `?${search.toString()}` : "";
-    window.history.pushState(
-      {},
-      "",
-      `${window.location.pathname}${window.location.search}#${path}${query}`,
-    );
+    window.history.pushState({}, "", `${path}${query}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
