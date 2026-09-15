@@ -22,7 +22,8 @@ export default defineConfig({
   },
   server: {
     port,
-    strictPort: true,
+    // Permite ao Vite escolher a próxima porta livre quando a padrão estiver ocupada.
+    strictPort: false,
     host: "0.0.0.0",
   },
   preview: {
