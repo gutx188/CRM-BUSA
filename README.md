@@ -16,14 +16,14 @@
 - ✅ **Log de atividades**
 - ✅ **Sincronização opcional com PocketBase** (desativada por padrão)
 - ✅ **Relatório de Assistências** (menu Operação → Relatório): resumo geral + tabela filtrável
-  - Filtros: período (data início/fim, ano, mês), tipo de assistência, status, localização (cidade/estado/CEP), nome do segurado, nº da apólice/protocolo e CPF/CNPJ
+  - Filtros: período (data início/fim, ano, mês), tipo de assistência, status, **seguradora (nome editável com sugestões)**, localização (cidade/estado/CEP), nome do segurado, nº da apólice/protocolo e CPF/CNPJ
   - Cards de resumo (total, em andamento, finalizadas, canceladas), chips dos filtros aplicados e exportação CSV
-  - Exportação em **PDF timbrado Busa** (resumo + ficha individual por assistência com QR code)
+  - Exportação em **PDF timbrado Busa** (papel timbrado branco: logo, seções numeradas azuis, resumo + ficha individual por assistência)
 - ✅ **Relatório de Sinistros** (menu Operação → Relatório · Sinistros)
-  - Filtros: período (data início/fim, ano, mês), estado do sinistro, localização (cidade/estado/CEP), nome do segurado, nº da apólice/sinistro e CPF/CNPJ
+  - Filtros: período (data início/fim, ano, mês), estado do sinistro, **seguradora (nome editável com sugestões)**, localização (cidade/estado/CEP), nome do segurado, nº da apólice/sinistro e CPF/CNPJ
   - Cards de resumo (total, em curso, finalizados, cancelados)
-  - **Relatório estruturado em JSON** (visualizador recolhível, copiar e baixar .json) com totais, distribuição por status/localização/segurado e lista de registros
-  - Exportação em **PDF timbrado Busa**: cantos navy, cabeçalho com logo, seções numeradas, linha do tempo de status, registro fotográfico (documentos anexados) e QR code de acompanhamento
+  - **Download de relatório estruturado em JSON** com filtros aplicados (incl. seguradora), totais e distribuição por status/localização/segurado
+  - Exportação em **PDF timbrado Busa**: papel timbrado branco com logo, seções numeradas azuis, ficha por sinistro e registro fotográfico (documentos anexados)
   - Opção de incluir ou não a ficha individual de cada sinistro no PDF
 
 ## URLs
