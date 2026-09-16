@@ -1,94 +1,73 @@
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { AppData } from "./types";
-import {
-  checkPocketBase,
-  getPocketBaseConfig,
-  isPocketBaseSyncEnabled,
-  loadPocketBaseData,
-  savePocketBaseData,
-} from "./pocketbase";
+import type { Branding } from "./db";
 
-/**
- * Compatibilidade com o estado original do projeto.
- *
- * A versão pública usa o armazenamento local do navegador por padrão.
- * Mantemos a mesma interface para que o estado da aplicação continue simples
- * de evoluir, mas não exigimos conta ou serviço externo para usar o painel.
- */
-
-export interface CloudConfig {
-  url: string;
-  anonKey: string;
-  workspace: string;
-}
-
-export interface CloudRecord {
-  workspace: string;
-  data: AppData;
-  updated_at: string;
-}
-
+export interface CloudConfig { url: string; anonKey: string; workspace: string }
+export interface CloudRecord { workspace: string; data: AppData; branding: Branding; updated_at: string }
 export type SyncStatus = "off" | "syncing" | "live" | "error";
 
+let client: SupabaseClient | null = null;
+const LAST_REMOTE_KEY = "seguros_crm_last_remote_v1";
+
+export function getClient() {
+  if (!client) {
+    const url = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) throw new Error("Supabase não está configurado neste ambiente.");
+    client = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  }
+  return client;
+}
+
+export function isCloudConfigured() { return Boolean(import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL); }
 export function loadCloudConfig(): CloudConfig | null {
-  if (!isPocketBaseSyncEnabled()) return null;
-  const config = getPocketBaseConfig();
-  if (!config) return null;
-  return { url: config.url, anonKey: "", workspace: config.workspace };
+  if (!isCloudConfigured()) return null;
+  return { url: import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL, anonKey: "", workspace: "workspace-pessoal" };
 }
+export function saveCloudConfig(_config: CloudConfig | null) {}
+export function getLastRemoteAt() { return localStorage.getItem(LAST_REMOTE_KEY); }
+export function setLastRemoteAt(iso: string | null) { if (iso) localStorage.setItem(LAST_REMOTE_KEY, iso); else localStorage.removeItem(LAST_REMOTE_KEY); }
+export function resetClient() { client = null; }
 
-export function saveCloudConfig(_config: CloudConfig | null): void {
-  // A configuração é feita por ambiente e não pelo navegador.
-}
-
-export function isCloudConfigured(): boolean {
-  return isPocketBaseSyncEnabled();
-}
-
-export function getLastRemoteAt(): string | null {
-  return null;
-}
-
-export function setLastRemoteAt(_iso: string | null): void {
-  // O modo local não mantém timestamp remoto.
-}
-
-export function resetClient(): void {
-  // Mantido para compatibilidade com o store legado.
-}
-
-export function getClient(): null {
-  return null;
+async function currentUser(): Promise<User> {
+  const { data, error } = await getClient().auth.getUser();
+  if (error || !data.user) throw new Error("Sua sessão expirou. Entre novamente.");
+  return data.user;
 }
 
 export async function loadFromCloud(): Promise<CloudRecord | null> {
-  const record = await loadPocketBaseData();
-  return record
-    ? { workspace: getPocketBaseConfig()?.workspace || "", data: record.data, updated_at: record.updated_at }
-    : null;
+  const user = await currentUser();
+  const { data, error } = await getClient().from("crm_workspaces").select("user_id,data,branding,updated_at").eq("user_id", user.id).maybeSingle();
+  if (error) throw new Error("Não foi possível carregar os dados da nuvem.");
+  return data ? { workspace: user.id, data: data.data as AppData, branding: (data.branding || {}) as Branding, updated_at: data.updated_at } : null;
 }
 
-export async function saveToCloud(data: AppData): Promise<string> {
-  return savePocketBaseData(data);
+export async function saveToCloud(data: AppData, branding?: Branding): Promise<string> {
+  const user = await currentUser();
+  const existing = await getClient().from("crm_workspaces").select("branding").eq("user_id", user.id).maybeSingle();
+  if (existing.error) throw new Error("Não foi possível preparar a sincronização.");
+  const updated_at = new Date().toISOString();
+  const result = await getClient().from("crm_workspaces").upsert({ user_id: user.id, data, branding: branding || existing.data?.branding || {}, updated_at }, { onConflict: "user_id" });
+  if (result.error) throw new Error("Não foi possível salvar os dados na nuvem.");
+  return updated_at;
 }
 
-export function subscribeToCloud(
-  _onChange: (record: CloudRecord) => void,
-  _onError?: (message: string) => void,
-): () => void {
-  return () => {};
+export function subscribeToCloud(onChange: (record: CloudRecord) => void, onError?: (message: string) => void) {
+  const channel = getClient().channel("crm-workspace").on("postgres_changes", { event: "UPDATE", schema: "public", table: "crm_workspaces" }, async (payload) => {
+    try { const user = await currentUser(); if (payload.new.user_id !== user.id) return; onChange({ workspace: user.id, data: payload.new.data as AppData, branding: (payload.new.branding || {}) as Branding, updated_at: payload.new.updated_at }); } catch { onError?.("Sessão expirada."); }
+  }).subscribe((status) => { if (status === "CHANNEL_ERROR") onError?.("Falha no canal de sincronização."); });
+  return () => { void getClient().removeChannel(channel); };
 }
 
-export async function testConnection(
-  _config: CloudConfig,
-): Promise<{ ok: boolean; msg: string }> {
-  if (!isPocketBaseSyncEnabled()) {
-    return {
-      ok: false,
-      msg: "A sincronização continua desativada. Ela só é habilitada por ambiente.",
-    };
-  }
-  const result = await checkPocketBase();
-  return { ok: result.ok, msg: result.message };
-}
-
+export async function testConnection(_config: CloudConfig) { try { await currentUser(); return { ok: true, msg: "Conexão Supabase ativa." }; } catch (e) { return { ok: false, msg: e instanceof Error ? e.message : "Falha na conexão." }; } }
 export const SETUP_SQL = "";
+
+export async function signOut() { await getClient().auth.signOut(); }
+export function onAuthStateChange(callback: (user: User | null) => void) { return getClient().auth.onAuthStateChange((_event, session) => callback(session?.user ?? null)); }
+export async function getCurrentUser() { const { data } = await getClient().auth.getSession(); return data.session?.user ?? null; }
+export async function signIn(email: string, password: string) { return getClient().auth.signInWithPassword({ email, password }); }
+export async function signUp(email: string, password: string, name: string) { return getClient().auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${window.location.origin}/auth/callback` } }); }
+
+export type { Branding };
+
+export function saveBrandingToCloud(data: AppData, branding: Branding) { return saveToCloud(data, branding); }
