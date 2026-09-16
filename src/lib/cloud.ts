@@ -35,11 +35,24 @@ async function currentUser(): Promise<User> {
   return data.user;
 }
 
+function isAppData(value: unknown): value is AppData {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return ["usuarios", "clientes", "seguradoras", "oficinas", "assistencias", "sinistros", "logs"].every(
+    (key) => Array.isArray(record[key]),
+  );
+}
+
+function parseRemoteData(value: unknown): AppData {
+  if (!isAppData(value)) throw new Error("Os dados da nuvem estão inválidos ou corrompidos.");
+  return value;
+}
+
 export async function loadFromCloud(): Promise<CloudRecord | null> {
   const user = await currentUser();
   const { data, error } = await getClient().from("crm_workspaces").select("user_id,data,branding,updated_at").eq("user_id", user.id).maybeSingle();
   if (error) throw new Error("Não foi possível carregar os dados da nuvem.");
-  return data ? { workspace: user.id, data: data.data as AppData, branding: (data.branding || {}) as Branding, updated_at: data.updated_at } : null;
+  return data ? { workspace: user.id, data: parseRemoteData(data.data), branding: (data.branding || {}) as Branding, updated_at: data.updated_at } : null;
 }
 
 export async function saveToCloud(data: AppData, branding?: Branding): Promise<string> {
@@ -54,7 +67,11 @@ export async function saveToCloud(data: AppData, branding?: Branding): Promise<s
 
 export function subscribeToCloud(onChange: (record: CloudRecord) => void, onError?: (message: string) => void) {
   const channel = getClient().channel("crm-workspace").on("postgres_changes", { event: "UPDATE", schema: "public", table: "crm_workspaces" }, async (payload) => {
-    try { const user = await currentUser(); if (payload.new.user_id !== user.id) return; onChange({ workspace: user.id, data: payload.new.data as AppData, branding: (payload.new.branding || {}) as Branding, updated_at: payload.new.updated_at }); } catch { onError?.("Sessão expirada."); }
+    try {
+      const user = await currentUser();
+      if (payload.new.user_id !== user.id) return;
+      onChange({ workspace: user.id, data: parseRemoteData(payload.new.data), branding: (payload.new.branding || {}) as Branding, updated_at: payload.new.updated_at });
+    } catch { onError?.("Não foi possível atualizar a sincronização."); }
   }).subscribe((status) => { if (status === "CHANNEL_ERROR") onError?.("Falha no canal de sincronização."); });
   return () => { void getClient().removeChannel(channel); };
 }
@@ -66,7 +83,16 @@ export async function signOut() { await getClient().auth.signOut(); }
 export function onAuthStateChange(callback: (user: User | null) => void) { return getClient().auth.onAuthStateChange((_event, session) => callback(session?.user ?? null)); }
 export async function getCurrentUser() { const { data } = await getClient().auth.getSession(); return data.session?.user ?? null; }
 export async function signIn(email: string, password: string) { return getClient().auth.signInWithPassword({ email, password }); }
-export async function signUp(email: string, password: string, name: string) { return getClient().auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${window.location.origin}/auth/callback` } }); }
+export async function signUp(email: string, password: string, name: string) {
+  return getClient().auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name },
+      emailRedirectTo: import.meta.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
+    },
+  });
+}
 
 export type { Branding };
 
