@@ -686,69 +686,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
 
-    void getCurrentUser()
-      .then((user) => {
+    setSyncStatus("syncing");
+    void loadFromCloud()
+      .then((rec) => {
         if (cancelled) return;
-        if (!user) {
-          cloudReadyRef.current = true;
-          setCloudEnabled(false);
-          setSyncStatus("off");
-          return;
+        if (rec) {
+          lastPushedAtRef.current = rec.updated_at;
+          setLastRemoteAt(rec.updated_at);
+          setLastSyncedAt(rec.updated_at);
+          applyingRemoteRef.current = true;
+          setData(rec.data);
+          setBrandingState(rec.branding);
+        } else {
+          void saveToCloud(data, branding)
+            .then((at) => {
+              if (cancelled) return;
+              lastPushedAtRef.current = at;
+              setLastRemoteAt(at);
+              setLastSyncedAt(at);
+            })
+            .catch(() => {
+              if (!cancelled) setSyncStatus("error");
+            });
         }
-
-        setSyncStatus("syncing");
-        void loadFromCloud()
-          .then((rec) => {
-            if (cancelled) return;
-            if (rec) {
-              lastPushedAtRef.current = rec.updated_at;
-              setLastRemoteAt(rec.updated_at);
-              setLastSyncedAt(rec.updated_at);
-              applyingRemoteRef.current = true;
-              setData(rec.data);
-              cloudReadyRef.current = true;
-              setSyncStatus("live");
-            } else {
-              cloudReadyRef.current = true;
-              setSyncStatus("live");
-              void saveToCloud(data)
-                .then((at) => {
-                  lastPushedAtRef.current = at;
-                  setLastRemoteAt(at);
-                  setLastSyncedAt(at);
-                })
-                .catch(() => {
-                  if (!cancelled) setSyncStatus("error");
-                });
-            }
-          })
-          .catch(() => {
-            if (cancelled) return;
-            cloudReadyRef.current = true;
-            setSyncStatus("error");
-            pushToast("Falha ao carregar dados da nuvem.", "error");
-          });
-
-        unsubscribe = subscribeToCloud(
-          (rec) => {
-            if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) return;
-            lastPushedAtRef.current = rec.updated_at;
-            setLastRemoteAt(rec.updated_at);
-            setLastSyncedAt(rec.updated_at);
-            applyingRemoteRef.current = true;
-            setData(rec.data);
-            setSyncStatus("live");
-          },
-          () => setSyncStatus("error"),
-        );
+        cloudReadyRef.current = true;
+        setSyncStatus("live");
       })
       .catch(() => {
-        if (!cancelled) {
-          cloudReadyRef.current = true;
-          setCloudEnabled(false);
-          setSyncStatus("off");
-        }
+        if (cancelled) return;
+        cloudReadyRef.current = true;
+        setSyncStatus("error");
+        pushToast("Falha ao carregar dados da nuvem.", "error");
       });
+
+    unsubscribe = subscribeToCloud(
+      (rec) => {
+        if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) return;
+        lastPushedAtRef.current = rec.updated_at;
+        setLastRemoteAt(rec.updated_at);
+        setLastSyncedAt(rec.updated_at);
+        applyingRemoteRef.current = true;
+        setData(rec.data);
+        setBrandingState(rec.branding);
+        setSyncStatus("live");
+      },
+      () => setSyncStatus("error"),
+    );
 
     return () => {
       cancelled = true;

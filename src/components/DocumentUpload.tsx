@@ -4,7 +4,7 @@ import { formatBytes, uid, nowISO } from "@/lib/utils";
 import { Button } from "./ui";
 import { IconDoc, IconTrash, IconUpload } from "./Icons";
 
-const MAX_FILE = 2 * 1024 * 1024; // 2MB per file (localStorage friendly)
+const MAX_FILE = 2 * 1024 * 1024; // limite de 2MB por arquivo para manter os registros leves
 
 export function DocumentUpload({
   documentos,

@@ -12,8 +12,6 @@ import type {
 } from "./types";
 import { uid, todayISODate } from "./utils";
 
-const STORAGE_KEY = "seguros_crm_data_v1";
-const SESSION_KEY = "seguros_crm_session_v1";
 
 // ---------------------------------------------------------------------------
 // Seed data
@@ -462,62 +460,15 @@ function seed(): AppData {
 // Persistence
 // ---------------------------------------------------------------------------
 export function loadData(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const s = seed();
-      saveData(s);
-      return s;
-    }
-    const parsed = JSON.parse(raw) as AppData;
-    // basic integrity
-    return {
-      usuarios: parsed.usuarios ?? [],
-      clientes: parsed.clientes ?? [],
-      seguradoras: parsed.seguradoras ?? [],
-      oficinas: parsed.oficinas ?? [],
-      assistencias: parsed.assistencias ?? [],
-      sinistros: parsed.sinistros ?? [],
-      logs: parsed.logs ?? [],
-    };
-  } catch {
-    const s = seed();
-    return s;
-  }
+  return seed();
 }
 
-export function saveData(data: AppData): boolean {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return true;
-  } catch (e) {
-    // likely quota exceeded (base64 documents)
-    console.warn("Falha ao salvar (armazenamento cheio)", e);
-    return false;
-  }
+export function saveData(_data: AppData): boolean {
+  return true;
 }
 
 export function resetData(): AppData {
-  const s = seed();
-  saveData(s);
-  return s;
-}
-
-export function getSessionUserId(): string | null {
-  try {
-    return localStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setSessionUserId(id: string | null): void {
-  try {
-    if (id) localStorage.setItem(SESSION_KEY, id);
-    else localStorage.removeItem(SESSION_KEY);
-  } catch {
-    /* ignore */
-  }
+  return seed();
 }
 
 // ---------------------------------------------------------------------------
@@ -529,8 +480,6 @@ export interface Branding {
   brokerTagline: string;
 }
 
-const BRANDING_KEY = "seguros_crm_branding_v1";
-
 const DEFAULT_BRANDING: Branding = {
   logoUrl: null,
   brokerName: "Busa Seguros",
@@ -538,25 +487,7 @@ const DEFAULT_BRANDING: Branding = {
 };
 
 export function loadBranding(): Branding {
-  try {
-    const raw = localStorage.getItem(BRANDING_KEY);
-    if (!raw) return DEFAULT_BRANDING;
-    const parsed = JSON.parse(raw) as Partial<Branding>;
-    return {
-      logoUrl: parsed.logoUrl ?? null,
-      brokerName: parsed.brokerName || DEFAULT_BRANDING.brokerName,
-      brokerTagline:
-        parsed.brokerTagline ?? DEFAULT_BRANDING.brokerTagline,
-    };
-  } catch {
-    return DEFAULT_BRANDING;
-  }
+  return { ...DEFAULT_BRANDING };
 }
 
-export function saveBranding(b: Branding): void {
-  try {
-    localStorage.setItem(BRANDING_KEY, JSON.stringify(b));
-  } catch (e) {
-    console.warn("Falha ao salvar branding", e);
-  }
-}
+export function saveBranding(_b: Branding): void {}
