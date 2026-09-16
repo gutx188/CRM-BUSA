@@ -1,5 +1,4 @@
 import { AppProvider, useApp } from "@/store/AppStore";
-import { AuthGate } from "@/components/AuthGate";
 import { Layout } from "@/components/Layout";
 import { Dashboard } from "@/pages/Dashboard";
 import { AssistenciaForm } from "@/pages/AssistenciaForm";
@@ -46,9 +45,7 @@ function Shell() {
 export default function App() {
   return (
     <AppProvider>
-      <AuthGate>
-        <Shell />
-      </AuthGate>
+      <Shell />
     </AppProvider>
   );
 }
