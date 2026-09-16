@@ -38,6 +38,7 @@ import {
   getLastRemoteAt,
   setLastRemoteAt,
   resetClient,
+  getCurrentUser,
   type CloudConfig,
   type SyncStatus,
 } from "../lib/cloud";
@@ -681,68 +682,77 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSyncStatus("off");
       return;
     }
+
     let cancelled = false;
-    setSyncStatus("syncing");
+    let unsubscribe: (() => void) | undefined;
 
-    loadFromCloud()
-      .then((rec) => {
+    void getCurrentUser()
+      .then((user) => {
         if (cancelled) return;
-        if (rec) {
-          lastPushedAtRef.current = rec.updated_at;
-          setLastRemoteAt(rec.updated_at);
-          setLastSyncedAt(rec.updated_at);
-          applyingRemoteRef.current = true;
-          setData(rec.data);
+        if (!user) {
           cloudReadyRef.current = true;
-          setSyncStatus("live");
-        } else {
-          // Nuvem vazia: envia o estado local atual (bootstrap)
-          cloudReadyRef.current = true;
-          setSyncStatus("live");
-          void saveToCloud(data)
-            .then((at) => {
-              lastPushedAtRef.current = at;
-              setLastRemoteAt(at);
-              setLastSyncedAt(at);
-            })
-            .catch((e) => {
-              setSyncStatus("error");
-              pushToast(
-                e instanceof Error ? e.message : "Falha no envio inicial.",
-                "error",
-              );
-            });
-        }
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        cloudReadyRef.current = true; // permite tentar sincronizar edições futuras
-        setSyncStatus("error");
-        pushToast(
-          e instanceof Error ? e.message : "Falha ao carregar dados da nuvem.",
-          "error",
-        );
-      });
-
-    const unsub = subscribeToCloud(
-      (rec) => {
-        // ignora o eco da nossa própria escrita
-        if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) {
+          setCloudEnabled(false);
+          setSyncStatus("off");
           return;
         }
-        lastPushedAtRef.current = rec.updated_at;
-        setLastRemoteAt(rec.updated_at);
-        setLastSyncedAt(rec.updated_at);
-        applyingRemoteRef.current = true;
-        setData(rec.data);
-        setSyncStatus("live");
-      },
-      () => setSyncStatus("error"),
-    );
+
+        setSyncStatus("syncing");
+        void loadFromCloud()
+          .then((rec) => {
+            if (cancelled) return;
+            if (rec) {
+              lastPushedAtRef.current = rec.updated_at;
+              setLastRemoteAt(rec.updated_at);
+              setLastSyncedAt(rec.updated_at);
+              applyingRemoteRef.current = true;
+              setData(rec.data);
+              cloudReadyRef.current = true;
+              setSyncStatus("live");
+            } else {
+              cloudReadyRef.current = true;
+              setSyncStatus("live");
+              void saveToCloud(data)
+                .then((at) => {
+                  lastPushedAtRef.current = at;
+                  setLastRemoteAt(at);
+                  setLastSyncedAt(at);
+                })
+                .catch(() => {
+                  if (!cancelled) setSyncStatus("error");
+                });
+            }
+          })
+          .catch(() => {
+            if (cancelled) return;
+            cloudReadyRef.current = true;
+            setSyncStatus("error");
+            pushToast("Falha ao carregar dados da nuvem.", "error");
+          });
+
+        unsubscribe = subscribeToCloud(
+          (rec) => {
+            if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) return;
+            lastPushedAtRef.current = rec.updated_at;
+            setLastRemoteAt(rec.updated_at);
+            setLastSyncedAt(rec.updated_at);
+            applyingRemoteRef.current = true;
+            setData(rec.data);
+            setSyncStatus("live");
+          },
+          () => setSyncStatus("error"),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          cloudReadyRef.current = true;
+          setCloudEnabled(false);
+          setSyncStatus("off");
+        }
+      });
 
     return () => {
       cancelled = true;
-      unsub();
+      unsubscribe?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudEnabled]);
