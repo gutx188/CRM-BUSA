@@ -38,6 +38,7 @@ import {
   getLastRemoteAt,
   setLastRemoteAt,
   resetClient,
+  getCurrentUser,
   type CloudConfig,
   type SyncStatus,
 } from "../lib/cloud";
@@ -681,10 +682,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSyncStatus("off");
       return;
     }
-    let cancelled = false;
-    setSyncStatus("syncing");
 
-    loadFromCloud()
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    setSyncStatus("syncing");
+    void loadFromCloud()
       .then((rec) => {
         if (cancelled) return;
         if (rec) {
@@ -693,48 +696,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setLastSyncedAt(rec.updated_at);
           applyingRemoteRef.current = true;
           setData(rec.data);
-          cloudReadyRef.current = true;
-          setSyncStatus("live");
+          setBrandingState(rec.branding);
         } else {
-          // Nuvem vazia: envia o estado local atual (bootstrap)
-          cloudReadyRef.current = true;
-          setSyncStatus("live");
-          void saveToCloud(data)
+          void saveToCloud(data, branding)
             .then((at) => {
+              if (cancelled) return;
               lastPushedAtRef.current = at;
               setLastRemoteAt(at);
               setLastSyncedAt(at);
             })
-            .catch((e) => {
-              setSyncStatus("error");
-              pushToast(
-                e instanceof Error ? e.message : "Falha no envio inicial.",
-                "error",
-              );
+            .catch(() => {
+              if (!cancelled) setSyncStatus("error");
             });
         }
+        cloudReadyRef.current = true;
+        setSyncStatus("live");
       })
-      .catch((e) => {
+      .catch(() => {
         if (cancelled) return;
-        cloudReadyRef.current = true; // permite tentar sincronizar edições futuras
+        cloudReadyRef.current = true;
         setSyncStatus("error");
-        pushToast(
-          e instanceof Error ? e.message : "Falha ao carregar dados da nuvem.",
-          "error",
-        );
+        pushToast("Falha ao carregar dados da nuvem.", "error");
       });
 
-    const unsub = subscribeToCloud(
+    unsubscribe = subscribeToCloud(
       (rec) => {
-        // ignora o eco da nossa própria escrita
-        if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) {
-          return;
-        }
+        if (lastPushedAtRef.current && rec.updated_at === lastPushedAtRef.current) return;
         lastPushedAtRef.current = rec.updated_at;
         setLastRemoteAt(rec.updated_at);
         setLastSyncedAt(rec.updated_at);
         applyingRemoteRef.current = true;
         setData(rec.data);
+        setBrandingState(rec.branding);
         setSyncStatus("live");
       },
       () => setSyncStatus("error"),
@@ -742,7 +735,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
-      unsub();
+      unsubscribe?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudEnabled]);

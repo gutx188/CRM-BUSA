@@ -30,7 +30,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       else setUser(result.data.user);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Não foi possível concluir o acesso.";
-      setError(/invalid login credentials|user already registered/i.test(message) ? "E-mail ou senha inválidos." : message);
+      if (/email not confirmed|confirm your email/i.test(message)) setError("Confirme seu e-mail antes de entrar.");
+      else if (/weak password|password should/i.test(message)) setError("A senha precisa ter pelo menos 6 caracteres.");
+      else if (/rate limit|too many requests/i.test(message)) setError("Muitas tentativas. Aguarde alguns minutos e tente novamente.");
+      else setError("Não foi possível concluir o acesso. Verifique os dados e tente novamente.");
     } finally { setBusy(false); }
   }
 
